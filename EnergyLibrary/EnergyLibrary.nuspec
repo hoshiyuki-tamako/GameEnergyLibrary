@@ -4,11 +4,11 @@
     <id>3432903b-5e3d-45f5-b151-3483100dc06c</id>
     <version>1.0.0</version>
     <title>TimeBasedGameEnergy</title>
-    <authors>$author$</authors>
+    <authors>hoshiyuki-tamako</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <license type="expression">MIT</license>
     <!-- <icon>icon.png</icon> -->
-    <projectUrl>http://project_url_here_or_delete_this_line/</projectUrl>
+    <projectUrl>https://github.com/hoshiyuki-tamako/GameEnergyLibrary</projectUrl>
     <description>Handling time based energy system for game</description>
     <releaseNotes></releaseNotes>
     <copyright></copyright>
