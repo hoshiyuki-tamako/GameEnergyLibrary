@@ -18,18 +18,18 @@ namespace EnergyLibraryTest
 
             // Add energy directly
             energy.Add(10);
-            Assert.Equal(10, energy.Amount);
+            Assert.Equal(10, energy.Total);
 
             // Set energy directly, will clamp value from option
-            energy.Amount = 999999;
-            Assert.Equal(energyOption.MaxAmount, energy.Amount); // Amount = 200
+            energy.Total = 999999;
+            Assert.Equal(energyOption.MaxAmount, energy.Total); // Amount = 200
 
             // Check will energy underflow
             Assert.True(energy.CanUse(20));
 
             // use energy
             energy.Use(20);
-            Assert.Equal(180, energy.Amount);
+            Assert.Equal(180, energy.Total);
 
             Assert.False(energy.CanUse(190));
             // will throw exception if not enough energy
@@ -58,10 +58,31 @@ namespace EnergyLibraryTest
 
             // 60 minutes / 10 minutes interval = 6 energy
             Assert.Equal(6, energy.EstamiteReceive());
-            Assert.Equal(100, energy.Amount);
+            Assert.Equal(106, energy.Total);
 
+            // it is suggested to call Receive() before changing interval
+            // trigger receive and dump the time to amount
             energy.Receive();
-            Assert.Equal(106, energy.Amount);
+            energy.Option.Interval = TimeSpan.FromMinutes(1);
+        }
+
+        [Fact]
+        public void C()
+        {
+            var energyOption = new EnergyOption
+            {
+                AllowOverflow = true,
+                Interval = TimeSpan.FromMinutes(10),
+            }.SetMinMax(0, 200);
+            var lastReceived = DateTime.Now - TimeSpan.FromHours(1);
+            var energy = new Energy(energyOption, energyOption.MaxAmount, lastReceived);
+
+            // Receive will not add extra energy due to its already reach limit or overflowed
+            // energy.Receive();
+
+            // Allow overflow adding
+            energy.Add(200);
+            Assert.Equal(400, energy.Total);
         }
     }
 }
