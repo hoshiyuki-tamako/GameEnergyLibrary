@@ -1,4 +1,7 @@
-﻿using System;
+﻿using EnergyLibrary.Schema;
+using ProtoBuf;
+using System;
+using System.IO;
 
 namespace EnergyLibrary
 {
@@ -114,8 +117,40 @@ namespace EnergyLibrary
 
             return this;
         }
+
+        /// <summary>
+        /// Export to a serializable class
+        /// </summary>
+        /// <returns></returns>
+        public EnergyOptionSchema Export()
+        {
+            return new EnergyOptionSchema
+            {
+                AllowOverFlow = AllowOverflow,
+                IntervalTick = Interval.Ticks,
+                MinAmount = MinAmount,
+                MaxAmount = MaxAmount,
+            };
+        }
+
+        /// <summary>
+        /// Import from schema
+        /// </summary>
+        /// <param name="energyOptionSchema"></param>
+        /// <returns></returns>
+        public static EnergyOption Import(EnergyOptionSchema energyOptionSchema)
+        {
+            return new EnergyOption
+            {
+                AllowOverflow = energyOptionSchema.AllowOverFlow,
+                Interval = TimeSpan.FromTicks(energyOptionSchema.IntervalTick),
+            }.SetMinMax(energyOptionSchema.MinAmount, energyOptionSchema.MaxAmount);
+        }
     }
 
+    /// <summary>
+    /// Energy class
+    /// </summary>
     public class Energy
     {
         protected int amount = 0;
@@ -149,8 +184,8 @@ namespace EnergyLibrary
             get
             {
                 return Option.AllowOverflow 
-                    ? EstamiteReceive() + Amount
-                    : Math.Clamp(EstamiteReceive() + Amount, Option.MinAmount, Option.MaxAmount);
+                    ? EstimateReceive() + Amount
+                    : Math.Clamp(EstimateReceive() + Amount, Option.MinAmount, Option.MaxAmount);
             }
 
             set
@@ -171,7 +206,7 @@ namespace EnergyLibrary
         /// <param name="option"></param>
         /// <param name="amount"></param>
         /// <param name="lastReceived"></param>
-        public Energy(EnergyOption option = default, int amount = 0, DateTime lastReceived = default)
+        public Energy(EnergyOption? option = default, int amount = 0, DateTime lastReceived = default)
         {
             Option = option ?? new();
             Amount = amount;
@@ -179,11 +214,56 @@ namespace EnergyLibrary
         }
 
         /// <summary>
-        /// Estamite adding raw value to amount
+        /// Export to a serializable class
+        /// </summary>
+        /// <returns></returns>
+        public EnergySchema Export()
+        {
+            return new EnergySchema
+            {
+                Option = Option.Export(),
+                Amount = Amount,
+                LastReceived = LastReceived.Ticks,
+            };
+        }
+
+        /// <summary>
+        /// Import from a serializable class
+        /// </summary>
+        /// <returns></returns>
+        public static Energy Import(EnergySchema energySchema)
+        {
+            return new Energy(EnergyOption.Import(energySchema.Option), energySchema.Amount, new DateTime(energySchema.LastReceived));
+        }
+
+        /// <summary>
+        /// use energy.Export() if possible, this function will required to copy the bytes and will cost performance hit
+        /// Export to protobuf
+        /// </summary>
+        /// <returns></returns>
+        public byte[] ToProtobuf()
+        {
+            using var memoryStream = new MemoryStream();
+            Serializer.Serialize(memoryStream, Export());
+            return memoryStream.ToArray();
+        }
+
+        /// <summary>
+        /// Import from protobuf
+        /// </summary>
+        /// <param name="buf"></param>
+        /// <returns></returns>
+        public static Energy FromProtobuf(byte[] bytes)
+        {
+            return Import(Serializer.Deserialize<EnergySchema>(bytes.AsSpan()));
+        }
+
+        /// <summary>
+        /// Estimate adding raw value to amount
         /// </summary>
         /// <param name="amount"></param>
         /// <returns>current amount without clamp</returns>
-        public int EstamiteAdd(int amount)
+        public int EstimateAdd(int amount)
         {
             return Total + amount;
         }
@@ -203,11 +283,11 @@ namespace EnergyLibrary
         }
 
         /// <summary>
-        /// Estamite using energy
+        /// Estimate using energy
         /// </summary>
         /// <param name="amount"></param>
         /// <returns>current amount without clamp</returns>
-        public int EstamiteUse(int amount)
+        public int EstimateUse(int amount)
         {
             return Total - amount;
         }
@@ -220,7 +300,7 @@ namespace EnergyLibrary
         public int Use(int amount)
         {
             var now = DateTime.Now;
-            var afterAmount = EstamiteReceive(now) + Amount - amount;
+            var afterAmount = EstimateReceive(now) + Amount - amount;
             if (afterAmount < Option.MinAmount)
             {
                 throw new OutOfEnergyException("Not enough energy to use");
@@ -231,20 +311,20 @@ namespace EnergyLibrary
         }
 
         /// <summary>
-        /// Estamite receiving energy from LastReceiveTime relative to DateTime.Now
+        /// Estimate receiving energy from LastReceiveTime relative to DateTime.Now
         /// </summary>
         /// <returns>receive amount</returns>
-        public int EstamiteReceive()
+        public int EstimateReceive()
         {
-            return EstamiteReceive(DateTime.Now);
+            return EstimateReceive(DateTime.Now);
         }
 
         /// <summary>
-        /// Estamite receiving energy from LastReceiveTime
+        /// Estimate receiving energy from LastReceiveTime
         /// </summary>
         /// <param name="now"></param>
         /// <returns>receive amount</returns>
-        public int EstamiteReceive(DateTime now)
+        public int EstimateReceive(DateTime now)
         {
             return (int)Math.Truncate((now - LastReceived) / Option.Interval);
         }
@@ -267,7 +347,7 @@ namespace EnergyLibrary
                 return 0;
             }
 
-            var diff = EstamiteReceive(now);
+            var diff = EstimateReceive(now);
             var afterAmount = Amount + diff;
             if (afterAmount >= Option.MaxAmount)
             {
@@ -279,6 +359,24 @@ namespace EnergyLibrary
 
             Amount = afterAmount;
             return diff;
+        }
+
+        /// <summary>
+        /// Fill energy to MaxAmount
+        /// </summary>
+        public void Fill()
+        {
+            Amount = Option.MaxAmount;
+            LastReceived = DateTime.Now;
+        }
+
+        /// <summary>
+        /// Rest energy to MinAmount
+        /// </summary>
+        public void UnFill()
+        {
+            Amount = Option.MinAmount;
+            LastReceived = DateTime.Now;
         }
 
         /// <summary>
@@ -297,7 +395,7 @@ namespace EnergyLibrary
                 return new TimeSpan();
             }
 
-            var penddingReceive = EstamiteReceive(now);
+            var penddingReceive = EstimateReceive(now);
             var nextReceiveTime = LastReceived + (Option.Interval * (penddingReceive + 1));
             return (now - nextReceiveTime).Duration();
         }
@@ -315,28 +413,28 @@ namespace EnergyLibrary
                 return new TimeSpan();
             }
 
-            var penddingReceive = EstamiteReceive(now);
+            var penddingReceive = EstimateReceive(now);
             var needed = penddingReceive + Option.MaxAmount - Amount;
             var totalInterval = Option.Interval * (needed - 1);
             return totalInterval + TimeUntilNext(now);
         }
 
         /// <summary>
-        /// Including EstamiteReceive amount and add x amount overflow (Option.MaxAmount)
+        /// Including EstimateReceive amount and add x amount overflow (Option.MaxAmount)
         /// </summary>
         /// <param name="addAmount"></param>
         /// <returns></returns>
-        public bool CanAdd(int addAmount = 0)
+        public bool CanAdd(int addAmount)
         {
             return (Total + addAmount) <= Option.MaxAmount;
         }
 
         /// <summary>
-        /// Including EstamiteReceive amount and add subtract x amount will underflow (Option.MinAmount)
+        /// Including EstimateReceive amount and add subtract x amount will underflow (Option.MinAmount)
         /// </summary>
         /// <param name="useAmount"></param>
         /// <returns></returns>
-        public bool CanUse(int useAmount = 0)
+        public bool CanUse(int useAmount)
         {
             return (Total - useAmount) >= Option.MinAmount;
         }
@@ -361,7 +459,7 @@ namespace EnergyLibrary
 
         protected bool IsFull(DateTime now)
         {
-            return (EstamiteReceive(now) + Amount) >= Option.MaxAmount;
+            return (EstimateReceive(now) + Amount) >= Option.MaxAmount;
         }
     }
 }

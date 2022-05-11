@@ -1,5 +1,7 @@
 ﻿using EnergyLibrary;
+using EnergyLibrary.Schema;
 using System;
+using System.Text.Json;
 using Xunit;
 
 namespace EnergyLibraryTest
@@ -16,7 +18,7 @@ namespace EnergyLibraryTest
 
             var energy = new Energy(energyOption, 0, DateTime.Now);
 
-            // Add energy directly
+            // Add energy directly, will clamp value from option
             energy.Add(10);
             Assert.Equal(10, energy.Total);
 
@@ -42,7 +44,7 @@ namespace EnergyLibraryTest
             // TimeSpan for how long will the next energy able to receive
             var time1 = energy.TimeUntilNext();
 
-            // TimeSpan for how long will the next energy able to receive
+            // TimeSpan for how long until energy is full
             var time2 = energy.TimeUntilFull();
         }
 
@@ -57,7 +59,7 @@ namespace EnergyLibraryTest
             var energy = new Energy(energyOption, 100, lastReceived);
 
             // 60 minutes / 10 minutes interval = 6 energy
-            Assert.Equal(6, energy.EstamiteReceive());
+            Assert.Equal(6, energy.EstimateReceive());
             Assert.Equal(106, energy.Total);
 
             // it is suggested to call Receive() before changing interval
@@ -83,6 +85,28 @@ namespace EnergyLibraryTest
             // Allow overflow adding
             energy.Add(200);
             Assert.Equal(400, energy.Total);
+        }
+
+        [Fact]
+        public void D()
+        {
+            var energyOption = new EnergyOption
+            {
+                AllowOverflow = true,
+                Interval = TimeSpan.FromMinutes(10),
+            }.SetMinMax(0, 200);
+            var lastReceived = DateTime.Now - TimeSpan.FromHours(1);
+            var energy = new Energy(energyOption, energyOption.MaxAmount, lastReceived);
+
+            // save the energy state to somewhere else
+            byte[] a = energy.ToProtobuf();
+            var b = Energy.FromProtobuf(a);
+
+            // using json
+            var jsonA = JsonSerializer.Serialize(energy.Export());
+#pragma warning disable CS8604 // Possible null reference argument.
+            var jsonB = Energy.Import(JsonSerializer.Deserialize<EnergySchema>(jsonA));
+#pragma warning restore CS8604 // Possible null reference argument.
         }
     }
 }

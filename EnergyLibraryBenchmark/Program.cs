@@ -27,10 +27,14 @@ namespace EnergyLibraryBenchmark
         public Energy energyEmpty;
         public Energy energyFull;
 
+        public byte[] export;
+
         public EnergyBenchmark()
         {
             energyEmpty = new(energyOption, energyOption.MinAmount, DateTime.Now);
             energyFull = new(energyOption, energyOption.MaxAmount, DateTime.Now);
+
+            export = energyFull.ToProtobuf();
         }
 
         [Benchmark]
@@ -73,6 +77,18 @@ namespace EnergyLibraryBenchmark
         public bool IsFull()
         {
             return energyEmpty.IsFull();
+        }
+
+        [Benchmark]
+        public byte[] ToProtobuf()
+        {
+            return energyEmpty.ToProtobuf();
+        }
+
+        [Benchmark]
+        public Energy FromProtobuf()
+        {
+            return Energy.FromProtobuf(export);
         }
     }
 }

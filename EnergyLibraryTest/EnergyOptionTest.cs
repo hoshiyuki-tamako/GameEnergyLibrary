@@ -1,4 +1,6 @@
-﻿using System;
+﻿using EnergyLibrary.Schema;
+using FluentAssertions;
+using System;
 using Xunit;
 
 namespace EnergyLibrary
@@ -62,6 +64,36 @@ namespace EnergyLibrary
         public void SetMinMaxThrow()
         {
             Assert.Throws<ArgumentException>(() => new EnergyOption().SetMinMax(10, 0));
+        }
+
+        [Fact]
+        public void Export()
+        {
+            var energyOption = new EnergyOption
+            {
+                AllowOverflow = true,
+            }.SetMinMax(20, 40);
+
+            var energyOptionSchema = new EnergyOptionSchema
+            {
+                AllowOverFlow = energyOption.AllowOverflow,
+                IntervalTick = energyOption.Interval.Ticks,
+                MinAmount = energyOption.MinAmount,
+                MaxAmount = energyOption.MaxAmount,
+            };
+
+            energyOptionSchema.Should().BeEquivalentTo(energyOption.Export());
+        }
+
+        [Fact]
+        public void Import()
+        {
+            var energyOption = new EnergyOption
+            {
+                AllowOverflow = true,
+            }.SetMinMax(20, 40);
+
+            energyOption.Should().BeEquivalentTo(EnergyOption.Import(energyOption.Export()));
         }
     }
 }
