@@ -31,6 +31,11 @@ namespace EnergyLibrary
         protected int maxAmount = 200;
 
         /// <summary>
+        /// Allow amount to be overflow
+        /// </summary>
+        public bool AllowOverflow { get; set; }
+
+        /// <summary>
         /// Time between energy recover
         /// </summary>
         public TimeSpan Interval
@@ -121,24 +126,44 @@ namespace EnergyLibrary
         public EnergyOption Option { get; protected set; }
 
         /// <summary>
-        /// Energy amount, clamp value when set
+        /// Raw energy amount
         /// </summary>
-        public int Amount {
+        public int Amount
+        {
             get
             {
                 return amount;
             }
+            set
+            {
+                amount = Option.AllowOverflow
+                    ? value 
+                    : Math.Clamp(value, Option.MinAmount, Option.MaxAmount);
+            }
+        }
+
+        /// <summary>
+        /// Total energy
+        /// </summary>
+        public int Total {
+            get
+            {
+                return Option.AllowOverflow 
+                    ? EstamiteReceive() + Amount
+                    : Math.Clamp(EstamiteReceive() + Amount, Option.MinAmount, Option.MaxAmount);
+            }
 
             set
             {
-                amount = Math.Clamp(value, Option.MinAmount, Option.MaxAmount);
+                Receive();
+                Amount = value;
             }
         }
 
         /// <summary>
         /// Last received energy time
         /// </summary>
-        public DateTime LastReceived { get; protected set; }
+        public DateTime LastReceived { get; set; }
 
         /// <summary>
         /// 
@@ -160,7 +185,7 @@ namespace EnergyLibrary
         /// <returns>current amount without clamp</returns>
         public int EstamiteAdd(int amount)
         {
-            return EstamiteReceive() + Amount + amount;
+            return Total + amount;
         }
 
         /// <summary>
@@ -173,7 +198,7 @@ namespace EnergyLibrary
             var oldAmount = Amount;
             var receiveAmount = Receive();
             var afterAmount = oldAmount + receiveAmount + amount;
-            Amount = Math.Clamp(afterAmount, Option.MinAmount, Option.MaxAmount);
+            Amount = afterAmount;
             return afterAmount;
         }
 
@@ -184,7 +209,7 @@ namespace EnergyLibrary
         /// <returns>current amount without clamp</returns>
         public int EstamiteUse(int amount)
         {
-            return EstamiteReceive() + Amount - amount;
+            return Total - amount;
         }
 
         /// <summary>
@@ -201,8 +226,8 @@ namespace EnergyLibrary
                 throw new OutOfEnergyException("Not enough energy to use");
             }
 
-
-            return Amount = Receive(now) + Amount - amount;
+            Receive(now);
+            return Amount -= amount;
         }
 
         /// <summary>
@@ -235,10 +260,15 @@ namespace EnergyLibrary
 
         protected int Receive(DateTime now)
         {
+            // if amount already overflow
+            if (Amount >= Option.MaxAmount)
+            {
+                LastReceived = now;
+                return 0;
+            }
+
             var diff = EstamiteReceive(now);
             var afterAmount = Amount + diff;
-            Amount = Math.Clamp(afterAmount, Option.MinAmount, Option.MaxAmount);
-
             if (afterAmount >= Option.MaxAmount)
             {
                 LastReceived = now;
@@ -247,6 +277,7 @@ namespace EnergyLibrary
                 LastReceived += Option.Interval * diff;
             }
 
+            Amount = afterAmount;
             return diff;
         }
 
@@ -297,7 +328,7 @@ namespace EnergyLibrary
         /// <returns></returns>
         public bool CanAdd(int addAmount = 0)
         {
-            return (EstamiteReceive() + Amount + addAmount) <= Option.MaxAmount;
+            return (Total + addAmount) <= Option.MaxAmount;
         }
 
         /// <summary>
@@ -307,7 +338,7 @@ namespace EnergyLibrary
         /// <returns></returns>
         public bool CanUse(int useAmount = 0)
         {
-            return (EstamiteReceive() + Amount - useAmount) >= Option.MinAmount;
+            return (Total - useAmount) >= Option.MinAmount;
         }
 
         /// <summary>
@@ -316,7 +347,7 @@ namespace EnergyLibrary
         /// <returns></returns>
         public bool IsEmpty()
         {
-            return (EstamiteReceive() + Amount) <= Option.MinAmount;
+            return Total <= Option.MinAmount;
         }
 
         /// <summary>

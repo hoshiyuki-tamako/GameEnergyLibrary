@@ -30,7 +30,7 @@ namespace EnergyLibraryTest
 
             var energy = new Energy(option, amount, time);
             energy.Option.Should().BeEquivalentTo(option);
-            Assert.Equal(amount, energy.Amount);
+            Assert.Equal(amount, energy.Total);
             Assert.Equal(time, energy.LastReceived);
         }
 
@@ -38,7 +38,7 @@ namespace EnergyLibraryTest
         public void SetAmount()
         {
             var energyOption = new EnergyOption();
-            var energy = new Energy(energyOption);
+            var energy = new Energy(energyOption, default, DateTime.Now);
 
             energy.Amount = energyOption.MinAmount - 1;
             Assert.Equal(energyOption.MinAmount, energy.Amount);
@@ -48,11 +48,51 @@ namespace EnergyLibraryTest
         }
 
         [Fact]
+        public void SetAmountAllowOverflow()
+        {
+            var energyOption = new EnergyOption
+            {
+                AllowOverflow = true,
+            };
+            var energy = new Energy(energyOption, energyOption.MaxAmount, DateTime.Now);
+
+            energy.Amount = energyOption.MaxAmount + 1;
+            Assert.Equal(energyOption.MaxAmount + 1, energy.Amount);
+        }
+
+        [Fact]
+        public void SetTotal()
+        {
+            var energyOption = new EnergyOption();
+            var energy = new Energy(energyOption, default, DateTime.Now);
+
+            energy.Total = energyOption.MinAmount - 1;
+            Assert.Equal(energyOption.MinAmount, energy.Total);
+
+            energy.Total = energyOption.MaxAmount + 1;
+            Assert.Equal(energyOption.MaxAmount, energy.Total);
+        }
+
+        [Fact]
+        public void SetTotalAllowOverflow()
+        {
+            var energyOption = new EnergyOption
+            {
+                AllowOverflow = true,
+            };
+            var energy = new Energy(energyOption, default, DateTime.Now);
+
+            energy.Total = energyOption.MaxAmount + 1;
+            Assert.Equal(energyOption.MaxAmount + 1, energy.Total);
+        }
+
+
+        [Fact]
         public void EstamiteAdd()
         {
             var energy = new Energy(default, default, DateTime.Now - TimeSpan.FromHours(1));
             Assert.Equal(16, energy.EstamiteAdd(10));
-            Assert.Equal(0, energy.Amount);
+            Assert.Equal(6, energy.Total);
         }
 
         [Fact]
@@ -60,8 +100,8 @@ namespace EnergyLibraryTest
         {
             var maxAmount = new EnergyOption().MaxAmount;
             var energy = new Energy(default, maxAmount, DateTime.Now - TimeSpan.FromHours(1));
-            Assert.Equal(maxAmount + 10 + 6, energy.EstamiteAdd(10));
-            Assert.Equal(maxAmount, energy.Amount);
+            Assert.Equal(maxAmount + 10, energy.EstamiteAdd(10));
+            Assert.Equal(maxAmount, energy.Total);
         }
 
         [Fact]
@@ -69,7 +109,7 @@ namespace EnergyLibraryTest
         {
             var energy = new Energy(default, default, DateTime.Now - TimeSpan.FromHours(1));
             Assert.Equal(16, energy.Add(10));
-            Assert.Equal(16, energy.Amount);
+            Assert.Equal(16, energy.Total);
         }
 
         [Fact]
@@ -77,8 +117,21 @@ namespace EnergyLibraryTest
         {
             var maxAmount = new EnergyOption().MaxAmount;
             var energy = new Energy(default, maxAmount, DateTime.Now - TimeSpan.FromHours(1));
-            Assert.Equal(maxAmount + 10 + 6, energy.Add(10));
-            Assert.Equal(maxAmount, energy.Amount);
+            Assert.Equal(maxAmount + 10, energy.Add(10));
+            Assert.Equal(maxAmount, energy.Total);
+        }
+
+        [Fact]
+        public void AddFullAllowOverflow()
+        {
+            var energyOption = new EnergyOption
+            {
+                AllowOverflow = true,
+            };
+
+            var energy = new Energy(energyOption, energyOption.MaxAmount, DateTime.Now - TimeSpan.FromHours(1));
+            Assert.Equal(energyOption.MaxAmount + 10, energy.Add(10));
+            Assert.Equal(energyOption.MaxAmount + 10, energy.Total);
         }
 
         [Fact]
@@ -87,7 +140,7 @@ namespace EnergyLibraryTest
             var maxAmount = new EnergyOption().MaxAmount;
             var energy = new Energy(default, maxAmount, DateTime.Now);
             Assert.Equal(maxAmount - 10, energy.EstamiteUse(10));
-            Assert.Equal(maxAmount, energy.Amount);
+            Assert.Equal(maxAmount, energy.Total);
         }
 
         [Fact]
@@ -95,7 +148,7 @@ namespace EnergyLibraryTest
         {
             var energy = new Energy(default, 0, DateTime.Now);
             Assert.Equal(-10, energy.EstamiteUse(10));
-            Assert.Equal(0, energy.Amount);
+            Assert.Equal(0, energy.Total);
         }
 
         [Fact]
@@ -104,7 +157,7 @@ namespace EnergyLibraryTest
             var maxAmount = new EnergyOption().MaxAmount;
             var energy = new Energy(default, maxAmount, DateTime.Now);
             Assert.Equal(maxAmount - 10, energy.Use(10));
-            Assert.Equal(maxAmount - 10, energy.Amount);
+            Assert.Equal(maxAmount - 10, energy.Total);
         }
 
         [Fact]
@@ -112,7 +165,7 @@ namespace EnergyLibraryTest
         {
             var energy = new Energy(default, 16, DateTime.Now);
             Assert.Equal(0, energy.Use(16));
-            Assert.Equal(0, energy.Amount);
+            Assert.Equal(0, energy.Total);
         }
 
         [Fact]
@@ -142,7 +195,7 @@ namespace EnergyLibraryTest
             var energyOption = new EnergyOption();
             var energy = new Energy(energyOption, 0, DateTime.Now - TimeSpan.FromHours(1));
             Assert.Equal(6, energy.Receive());
-            Assert.Equal(6, energy.Amount);
+            Assert.Equal(6, energy.Total);
             Assert.True((DateTime.Now - energy.LastReceived) < energyOption.Interval);
         }
 
@@ -152,7 +205,21 @@ namespace EnergyLibraryTest
             var energyOption = new EnergyOption();
             var energy = new Energy(energyOption);
             energy.Receive();
-            Assert.Equal(energyOption.MaxAmount, energy.Amount);
+            Assert.Equal(energyOption.MaxAmount, energy.Total);
+            Assert.True((DateTime.Now - energy.LastReceived) < energyOption.Interval);
+        }
+
+
+        [Fact]
+        public void ReceiveOverflow()
+        {
+            var energyOption = new EnergyOption
+            {
+                AllowOverflow = true,
+            };
+            var energy = new Energy(energyOption, energyOption.MaxAmount + 1);
+            energy.Receive();
+            Assert.Equal(energyOption.MaxAmount + 1, energy.Total);
             Assert.True((DateTime.Now - energy.LastReceived) < energyOption.Interval);
         }
 
@@ -233,7 +300,8 @@ namespace EnergyLibraryTest
         public void CanAddMaxTime()
         {
             var energy = new Energy();
-            Assert.False(energy.CanAdd());
+            Assert.True(energy.CanAdd());
+            Assert.False(energy.CanAdd(1));
         }
 
         [Fact]
@@ -276,7 +344,7 @@ namespace EnergyLibraryTest
             var energy = new Energy(default, 0, DateTime.Now);
             Assert.True(energy.IsEmpty());
 
-            energy.Amount = 1;
+            energy.Total = 1;
             Assert.False(energy.IsEmpty());
         }
 
@@ -294,7 +362,7 @@ namespace EnergyLibraryTest
             var energy = new Energy(energyOption, 0, DateTime.Now);
             Assert.False(energy.IsFull());
 
-            energy.Amount = energyOption.MaxAmount;
+            energy.Total = energyOption.MaxAmount;
             Assert.True(energy.IsFull());
         }
 
