@@ -19,7 +19,7 @@ namespace EnergyLibraryBenchmark
     {
         public EnergyOption energyOption = new()
         {
-            Interval = TimeSpan.FromMilliseconds(1000),
+            Interval = TimeSpan.FromMilliseconds(10),
             MinAmount = int.MinValue,
             MaxAmount = int.MaxValue,
         };
@@ -34,45 +34,45 @@ namespace EnergyLibraryBenchmark
         }
 
         [Benchmark]
-        public void Add()
+        public int Total()
         {
-            energyEmpty.Add(1);
+            return energyEmpty.Total;
         }
 
         [Benchmark]
-        public void Use()
+        public int Add()
         {
-            energyFull.Use(1);
+            return energyEmpty.Add(1);
         }
 
         [Benchmark]
-        public void Receive()
+        public int Use()
         {
-            energyEmpty.Receive();
+            return energyFull.Use(1);
         }
 
         [Benchmark]
-        public void TimeUntilNext()
+        public TimeSpan TimeUntilNext()
         {
-            energyEmpty.TimeUntilNext();
+            return energyEmpty .TimeUntilNext();
         }
 
         [Benchmark]
-        public void TimeUntilFull()
+        public TimeSpan TimeUntilFull()
         {
-            energyEmpty.TimeUntilFull();
+            return energyEmpty.TimeUntilFull();
         }
 
         [Benchmark]
-        public void CanUse()
+        public bool CanUse()
         {
-            energyEmpty.CanUse(1);
+            return energyEmpty.CanUse(1);
         }
 
         [Benchmark]
-        public void IsFull()
+        public bool IsFull()
         {
-            energyEmpty.IsFull();
+            return energyEmpty.IsFull();
         }
     }
 }
