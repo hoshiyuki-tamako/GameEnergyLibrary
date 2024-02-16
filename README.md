@@ -1,5 +1,7 @@
 # Energy Library
 
+A library handle time based game energy
+
 see unit test for more example
 
 ```cs
